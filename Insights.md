@@ -1,0 +1,46 @@
+# Interfaces
+An interface in go is very similar to one in Java. It defines the functions that must be implmented by all types that adhere to the interface.
+
+In Go, interfaces determine subtyping through a mechanism called "implementing" rather than explicit subtyping declarations. A type is considered to satisfy an interface if it provides all the methods defined by that interface.
+
+# Structs
+A little different from in syntax from Rust but like Rust all fields are private by default unless specified otherwise.
+```Go
+// Also notice the no `:` and `,` when defining the types of the struct fields.
+type TCPTransport struct {
+	ListenAddress string
+	Listener      net.Listener
+
+	mu sync.RWMutex
+	peers map[net.Addr]Peer
+}
+```
+To make a struct field public, it must start with an uppercase letter, which exports the field and allows access from outside the package.
+
+# Documentation Practices
+1. If you are documenting a type interface you should always start woth the type as the first word.
+
+# Best Pracitices
+1. When defining fields, we use groups and put our mutexes above the things we want to protect.
+  ```Go
+  type TCPTransport struct {
+  	ListenAddress string
+  	Listener      net.Listener
+  
+  	// We group the mutex with the peers cause we want to protect it.
+  	mu sync.RWMutex
+  	peers map[net.Addr]Peer
+  }
+  ```
+2. Functions names are in Pascal case. Public functions start with an uppercase letter while private functions start with a lowercase character.
+3. For good quality code always put the public functions on top and private functions at the bottom.
+Organize your code how someone is liekly to read it. Also put important functions on the top anbd helpers at the bottom.
+
+# Go Routines
+
+
+# Formatted strings
+1. `%v` is used to print a value with its field names included when formatting structs
+2. `%s` is placeholder for string values within a format string
+
+# Select
