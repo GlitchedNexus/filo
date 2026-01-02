@@ -101,11 +101,7 @@ func (s *Store) Has(key string) bool {
 
 	_, err := os.Stat(fullPathWithRoot)
 
-	if errors.Is(err, os.ErrNotExist) {
-		return false
-	}
-
-	return true
+	return !errors.Is(err, os.ErrNotExist)
 }
 
 func (s *Store) Clear() error {
@@ -139,6 +135,10 @@ func (s *Store) Read(key string) (io.Reader, error) {
 	_, err = io.Copy(buf, f)
 
 	return buf, nil
+}
+
+func (s *Store) Write(key string, r io.Reader) error {
+	return s.writeStream(key, r)
 }
 
 func (s *Store) readStream(key string) (io.ReadCloser, error) {
