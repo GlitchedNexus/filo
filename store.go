@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"strings"
@@ -51,6 +52,16 @@ func (p PathKey) FullPath() string {
 	return fmt.Sprintf("%s/%s", p.PathName, p.FileName)
 }
 
+func (p PathKey) FirstPathName() string {
+	paths := strings.Split(p.PathName, "/")
+
+	if len(paths) == 0 {
+		return ""
+	}
+
+	return paths[0]
+}
+
 type StoreOptions struct {
 	PathTransformFunc PathTransformFunc
 }
@@ -63,6 +74,28 @@ func NewStore(options StoreOptions) *Store {
 	return &Store{
 		StoreOptions: options,
 	}
+}
+
+func (s *Store) Has(key string) bool {
+	pathKey := s.PathTransformFunc(key)
+
+	_, err := os.Stat(pathKey.FullPath())
+	if err == fs.ErrNotExist {
+		return false
+	}
+
+	return true
+}
+
+func (s *Store) Delete(key string) error {
+	pathKey := s.PathTransformFunc(key)
+
+	defer func() {
+		log.Printf("delted [%s] from disk", pathKey.FileName)
+	}()
+
+	return os.RemoveAll(pathKey.FirstPathName())
+
 }
 
 func (s *Store) Read(key string) (io.Reader, error) {
