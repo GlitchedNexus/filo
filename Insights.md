@@ -36,6 +36,7 @@ To make a struct field public, it must start with an uppercase letter, which exp
 3. For good quality code always put the public functions on top and private functions at the bottom.
 Organize your code how someone is liekly to read it. Also put important functions on the top anbd helpers at the bottom.
 4. Always make your errors lower caps.
+5. When writing go libraries you should make an effort to provide NOP types that do nothing to allow easier testing.
 
 # Go Routines
 
@@ -44,10 +45,23 @@ Organize your code how someone is liekly to read it. Also put important function
 1. `%v` is used to print a value with its field names included when formatting structs
 2. `%s` is placeholder for string values within a format string
 
+# Anonymous functions
+We can use the `func` to define anonymous functions like shown below.
+```Go
+	go func() {
+		for {
+			msg := <-tr.Consume()
+			fmt.Printf("%+v\n", msg)
+		}
+	}()
+
+```
+
+
+# The GOB Package
+Helps to encode and decode binary values exhanged between the transmitter (Encoder) and Receiver (Decoder).
+
 # Select
 
 
 # Handshakes
-
-# The GOB Package
-Helps to encode and decode binary values exhanged between the transmitter (Encoder) and Receiver (Decoder).
