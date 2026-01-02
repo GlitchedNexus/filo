@@ -54,14 +54,56 @@ We can use the `func` to define anonymous functions like shown below.
 			fmt.Printf("%+v\n", msg)
 		}
 	}()
-
 ```
+Here the trailing `()` tells our code to “call it immediately”. So when we add the the trailing `()` it converts
+the function value to function call without which we would get a compile time error.
+```Go
+go <function-call>
 
+// Valid
+go f()
+go func() {}()
+
+// Invalid
+go f
+go func() {}
+```
+In our invalid version the compiler sees: `go (a function value)`.
+
+Go does not allow us to start a goroutine with a function value without calling it.
 
 # The GOB Package
 Helps to encode and decode binary values exhanged between the transmitter (Encoder) and Receiver (Decoder).
 
+# Defer
+The `defer` keyword schedules a function call to run when the surrounding function returns.
+```Go
+func example() {
+    defer fmt.Println("world")
+    fmt.Println("hello")
+}
+```
+This code will give the output
+```Text
+hello
+world
+```
+This is because when our function runs `fmt.Println("world")` is registered and it runs after example() finishes.
+
+When Go sees:
+
+```Go
+defer f(x, y)
+```
+
+It does two things immediately:
+1. Evaluates arguments (x, y)
+2. Pushes the call onto a defer stack
+
+Then later when the function returns (normally or via panic) all the deferred calls run in LIFO order (stack behavior).
+
 # Select
 
+# Channels
 
 # Handshakes

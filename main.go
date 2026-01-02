@@ -7,11 +7,17 @@ import (
 	"github.com/GlitchedNexus/filo/p2p"
 )
 
+func OnPeer(p2p.Peer) error {
+	fmt.Println("doing some logic with the peer outside tcp transport")
+	return nil
+}
+
 func main() {
 	tcpOpts := p2p.TCPTransportOptions{
 		ListenAddr:    ":3000",
 		Decoder:       p2p.DefaultDecoder{},
 		HandshakeFunc: p2p.NOPHandshakeFunc,
+		OnPeer:        OnPeer,
 	}
 
 	tr := p2p.NewTCPTransport(tcpOpts)
