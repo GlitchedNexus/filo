@@ -35,6 +35,7 @@ To make a struct field public, it must start with an uppercase letter, which exp
 2. Functions names are in Pascal case. Public functions start with an uppercase letter while private functions start with a lowercase character.
 3. For good quality code always put the public functions on top and private functions at the bottom.
 Organize your code how someone is liekly to read it. Also put important functions on the top anbd helpers at the bottom.
+4. Always make your errors lower caps.
 
 # Go Routines
 
@@ -44,3 +45,9 @@ Organize your code how someone is liekly to read it. Also put important function
 2. `%s` is placeholder for string values within a format string
 
 # Select
+
+
+# Handshakes
+
+# The GOB Package
+Helps to encode and decode binary values exhanged between the transmitter (Encoder) and Receiver (Decoder).
