@@ -60,17 +60,6 @@ type TCPTransport struct {
 	peers map[net.Addr]Peer
 }
 
-// If we used the interface type (Transport) as a return value
-// we will encounter the problem of having to type cast
-// return value to a TCPTransport to get access to the
-// internal fields, i.e.,
-//
-//	func Test() {
-//	    tcp := NewTCPTransport().(*TCPTransport)
-//
-//	    // We cannot call this without the type cast.
-//		tcp.listener.Accept()
-//	}
 func NewTCPTransport(options TCPTransportOptions) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOptions: options,
@@ -115,11 +104,11 @@ func (t *TCPTransport) startAcceptLoop() {
 
 		fmt.Printf("Incoming connection: %+v\n", conn)
 
-		go t.handleConn(conn)
+		go t.handleConn(conn, false)
 	}
 }
 
-func (t *TCPTransport) handleConn(conn net.Conn) {
+func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 	var err error
 
 	defer func() {
@@ -127,7 +116,7 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 		conn.Close()
 	}()
 
-	peer := NewTCPPeer(conn, true)
+	peer := NewTCPPeer(conn, outbound)
 
 	if err = t.HandshakeFunc(peer); err != nil {
 		return
@@ -162,4 +151,17 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 // Close implements the Transport interface.
 func (t *TCPTransport) Close() error {
 	return t.listener.Close()
+}
+
+// Dial implements the Transport interface.
+func (t *TCPTransport) Dial(addr string) error {
+	conn, err := net.Dial("tcp", addr)
+
+	if err != nil {
+		return nil
+	}
+
+	go t.handleConn(conn, true)
+
+	return nil
 }
