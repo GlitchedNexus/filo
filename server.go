@@ -1,12 +1,25 @@
 package main
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
+	"io"
 	"log"
 	"sync"
 
 	"github.com/GlitchedNexus/filo/p2p"
 )
+
+type DataMessage struct {
+	Key  string
+	Data []byte
+}
+
+type Message struct {
+	From    string
+	Payload any
+}
 
 type FileServerOptions struct {
 	StorageRoot       string
@@ -40,6 +53,70 @@ func NewFileServer(options FileServerOptions) *FileServer {
 	}
 }
 
+func (s *FileServer) broadcast(msg *Message) error {
+
+	// We collect peers as io.Writer because:
+	// - TCPPeer embeds net.Conn
+	// - net.Conn implements io.Writer (Write([]byte) (int, error))
+	// - Embedded methods are promoted, so *TCPPeer has a Write method
+	// - Therefore *TCPPeer implicitly satisfies io.Writer
+	//
+	// This allows us to treat peers as generic writers and broadcast
+	// the same byte stream to all of them.
+	peers := []io.Writer{}
+
+	for _, peer := range s.peers {
+		// Each peer is a *TCPPeer, which is valid as an io.Writer
+		// as long as peer.Conn is non-nil.
+		peers = append(peers, peer)
+	}
+
+	// io.MultiWriter returns a Writer that duplicates each Write
+	// call to all provided writers sequentially.
+	//
+	// NOTE:
+	// - MultiWriter does NOT add framing or synchronization.
+	// - If multiple goroutines call broadcast concurrently,
+	//   writes to the same underlying net.Conn may interleave.
+	// - In production, consider per-peer write goroutines or
+	//   message framing (length-prefix, etc.).
+	mw := io.MultiWriter(peers...)
+
+	// gob.NewEncoder writes encoded data to the provided io.Writer.
+	// Since mw is a MultiWriter, the encoded payload is sent to
+	// all peers simultaneously.
+	//
+	// Encode blocks until all writes complete or an error occurs.
+	return gob.NewEncoder(mw).Encode(msg)
+}
+
+func (s *FileServer) StoreData(key string, r io.Reader) error {
+	// 1. Store the file to disk
+	// 2. Broadcast this file to all known peers in the network
+	buf := new(bytes.Buffer)
+	tee := io.TeeReader(r, buf)
+
+	if err := s.store.Write(key, tee); err != nil {
+		return err
+	}
+
+	_, err := io.Copy(buf, r)
+
+	if err != nil {
+		return nil
+	}
+
+	p := &DataMessage{
+		Key:  key,
+		Data: buf.Bytes(),
+	}
+
+	return s.broadcast(&Message{
+		From:    "TODO",
+		Payload: p,
+	})
+}
+
 func (s *FileServer) Stop() {
 	close(s.quitch)
 }
@@ -64,11 +141,26 @@ func (s *FileServer) loop() {
 	for {
 		select {
 		case msg := <-s.Transport.Consume():
-			fmt.Println(msg)
+			var m Message
+			if err := gob.NewDecoder(bytes.NewReader(msg.Payload)).Decode(&m); err != nil {
+				log.Println(err)
+			}
+			if err := s.handleMessage(&m); err != nil {
+				log.Println(err)
+			}
 		case <-s.quitch:
 			return
 		}
 	}
+}
+
+func (s *FileServer) handleMessage(msg *Message) error {
+	switch v := msg.Payload.(type) {
+	case *DataMessage:
+		fmt.Printf("received data %+v\n", v)
+	}
+
+	return nil
 }
 
 func (s *FileServer) bootstrapNetwork() error {

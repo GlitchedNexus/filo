@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"log"
+	"time"
 
 	"github.com/GlitchedNexus/filo/p2p"
 )
@@ -37,6 +39,15 @@ func main() {
 		log.Fatal(s1.Start())
 	}()
 
-	s2.Start()
+	time.Sleep(time.Second * 2)
 
+	go s2.Start()
+
+	time.Sleep(time.Second * 2)
+
+	data := bytes.NewReader([]byte("my big data file here!"))
+
+	s2.StoreData("myprivatedata", data)
+
+	select {}
 }
