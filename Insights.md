@@ -559,3 +559,7 @@ If your struct contains **any** of these:
 3. `Model` → tiny, immutable, value-semantic
 4. Constructor returns `&Model{}` → **methods should use `*Model`**
 5. Go auto-derefs for you — ergonomics stay clean
+
+
+## Why use Reader & Writers Instead of other things?
+While using byte buffers is a valid option to send data between peers, readers and writers are much more general and are compatible with every data type.
