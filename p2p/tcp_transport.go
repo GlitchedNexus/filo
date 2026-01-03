@@ -28,11 +28,22 @@ type TCPPeer struct {
 	outbound bool
 }
 
+// RemoteAddr implements the Peer interface and will return the
+// remote address of its unerlying connection.
+func (p *TCPPeer) RemoteAddr() net.Addr {
+	return p.conn.RemoteAddr()
+}
+
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		conn:     conn,
 		outbound: outbound,
 	}
+}
+
+func (p *TCPPeer) Send(b []byte) error {
+	_, err := p.conn.Write(b)
+	return err
 }
 
 // Close implements the peer interface.
@@ -158,7 +169,7 @@ func (t *TCPTransport) Dial(addr string) error {
 	conn, err := net.Dial("tcp", addr)
 
 	if err != nil {
-		return nil
+		return err
 	}
 
 	go t.handleConn(conn, true)
