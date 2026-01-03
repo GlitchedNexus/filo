@@ -50,7 +50,7 @@ func main() {
 
 	// s2.Store("myprivatedata", data)
 
-	r, err := s2.Get("foo")
+	r, err := s2.Get("myprivatedata")
 
 	if err != nil {
 		log.Fatal(err)

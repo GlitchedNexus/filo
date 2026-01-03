@@ -128,6 +128,25 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 		return nil, err
 	}
 
+	time.Sleep(time.Second * 3)
+
+	for _, peer := range s.peers {
+
+		fmt.Println("receiving stream from peer:", peer.RemoteAddr())
+
+		fileBuffer := new(bytes.Buffer)
+
+		n, err := io.CopyN(fileBuffer, peer, 22)
+
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Printf("received %d bytes over the network", n)
+
+		fmt.Println(fileBuffer.String())
+	}
+
 	select {}
 
 	return nil, nil
@@ -226,10 +245,11 @@ func (s *FileServer) handleMessage(from string, msg *Message) error {
 }
 
 func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error {
-	if s.store.Has(msg.Key) {
+	if !s.store.Has(msg.Key) {
 		return fmt.Errorf("need to serve file (%s) but it doesn't exist on disk", msg.Key)
 	}
 
+	fmt.Printf("serving file (%s) over the network\n", msg.Key)
 	r, err := s.store.Read(msg.Key)
 
 	if err != nil {
