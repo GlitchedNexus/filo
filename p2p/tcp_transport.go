@@ -156,6 +156,7 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 		rpc.From = conn.RemoteAddr().String()
 
 		if rpc.Stream {
+
 			peer.wg.Add(1)
 
 			fmt.Printf("[%s] incoming stream, waiting ...\n", conn.RemoteAddr())

@@ -111,7 +111,7 @@ func (s *Store) Delete(key string) error {
 	pathKey := s.PathTransformFunc(key)
 
 	defer func() {
-		log.Printf("delted [%s] from disk", pathKey.FileName)
+		log.Printf("deleted [%s] from disk", pathKey.FileName)
 	}()
 
 	firstPathNamewithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FirstPathName())
