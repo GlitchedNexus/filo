@@ -18,15 +18,23 @@ type Message struct {
 }
 
 type MessageStoreFile struct {
+	ID   string
 	Key  string
 	Size int64
 }
 
 type MessageGetFile struct {
 	Key string
+	ID  string
+}
+
+type MessageDeleteFile struct {
+	Key string
+	ID  string
 }
 
 type FileServerOptions struct {
+	ID                string
 	EncKey            []byte
 	StorageRoot       string
 	PathTransformFunc PathTransformFunc
@@ -49,6 +57,10 @@ func NewFileServer(options FileServerOptions) *FileServer {
 	storeOptions := StoreOptions{
 		Root:              options.StorageRoot,
 		PathTransformFunc: options.PathTransformFunc,
+	}
+
+	if len(options.ID) == 0 {
+		options.ID = generateID()
 	}
 
 	return &FileServer{
@@ -116,10 +128,10 @@ func (s *FileServer) broadcast(msg *Message) error {
 }
 
 func (s *FileServer) Get(key string) (io.Reader, error) {
-	if s.store.Has(key) {
+	if s.store.Has(s.ID, key) {
 		fmt.Printf("[%s] serving file (%s) from local disk.\n", s.Transport.Addr(), key)
 
-		_, r, err := s.store.Read(key)
+		_, r, err := s.store.Read(s.ID, key)
 		return r, err
 	}
 
@@ -128,6 +140,7 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 	msg := Message{
 		Payload: MessageGetFile{
 			Key: hashKey(key),
+			ID:  s.ID,
 		},
 	}
 
@@ -145,7 +158,7 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 		var fileSize int64
 		binary.Read(peer, binary.LittleEndian, &fileSize)
 
-		n, err := s.store.WriteDecrypt(s.EncKey, key, io.LimitReader(peer, fileSize))
+		n, err := s.store.WriteDecrypt(s.EncKey, s.ID, key, io.LimitReader(peer, fileSize))
 
 		if err != nil {
 			return nil, err
@@ -156,9 +169,34 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 		peer.CloseStream()
 	}
 
-	_, r, err := s.store.Read(key)
+	_, r, err := s.store.Read(s.ID, key)
 
 	return r, err
+}
+
+func (s *FileServer) Delete(key string) error {
+	if !s.store.Has(s.ID, key) {
+		return fmt.Errorf("[%s] desired file (%s) doesn't exist.\n", s.Transport.Addr(), key)
+	}
+
+	msg := Message{
+		Payload: MessageDeleteFile{
+			Key: hashKey(key),
+			ID:  s.ID,
+		},
+	}
+
+	if err := s.broadcast(&msg); err != nil {
+		return err
+	}
+
+	time.Sleep(time.Millisecond * 500)
+
+	if err := s.store.Delete(s.ID, key); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *FileServer) Store(key string, r io.Reader) error {
@@ -170,7 +208,7 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 		tee        = io.TeeReader(r, fileBuffer)
 	)
 
-	size, err := s.store.Write(key, tee)
+	size, err := s.store.Write(s.ID, key, tee)
 
 	if err != nil {
 		return err
@@ -178,6 +216,7 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 
 	msg := Message{
 		Payload: MessageStoreFile{
+			ID:   s.ID,
 			Key:  hashKey(key),
 			Size: size + 16,
 		},
@@ -254,19 +293,42 @@ func (s *FileServer) handleMessage(from string, msg *Message) error {
 		return s.handleMessageStoreFile(from, v)
 	case MessageGetFile:
 		return s.handleMessageGetFile(from, v)
+	case MessageDeleteFile:
+		return s.handleMessageDeleteFile(from, v)
 	}
 
 	return nil
 }
 
+func (s *FileServer) handleMessageDeleteFile(from string, msg MessageDeleteFile) error {
+
+	_, ok := s.peers[from]
+
+	if !ok {
+		return fmt.Errorf("peer (%s) could not be found in the peer list", from)
+	}
+
+	if !s.store.Has(msg.ID, msg.Key) {
+		return fmt.Errorf("[%s] desired file (%s) doesn't exist.\n", s.Transport.Addr(), msg.Key)
+	}
+
+	if err := s.store.Delete(msg.ID, msg.Key); err != nil {
+		return err
+	}
+
+	fmt.Printf("[%s] File Deleted...", s.Transport.Addr())
+
+	return nil
+}
+
 func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error {
-	if !s.store.Has(msg.Key) {
+	if !s.store.Has(msg.ID, msg.Key) {
 		return fmt.Errorf("[%s] need to serve file (%s) but it doesn't exist on disk", s.Transport.Addr(), msg.Key)
 	}
 
 	fmt.Printf("[%s] serving file (%s) over the network\n", s.Transport.Addr(), msg.Key)
 
-	fileSize, r, err := s.store.Read(msg.Key)
+	fileSize, r, err := s.store.Read(msg.ID, msg.Key)
 
 	if err != nil {
 		return err
@@ -283,8 +345,6 @@ func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error
 		return fmt.Errorf("peer %s not in map", from)
 	}
 
-	// First send the "incomingStream" byte to the peer.
-	// Then we send over the file size as an int64
 	peer.Send([]byte{p2p.IncomingStream})
 
 	binary.Write(peer, binary.LittleEndian, fileSize)
@@ -307,7 +367,7 @@ func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 		return fmt.Errorf("peer (%s) could not be found in the peer list", from)
 	}
 
-	n, err := s.store.Write(msg.Key, io.LimitReader(peer, msg.Size))
+	n, err := s.store.Write(msg.ID, msg.Key, io.LimitReader(peer, msg.Size))
 
 	if err != nil {
 		return err
@@ -359,4 +419,5 @@ func (s *FileServer) Start() error {
 func init() {
 	gob.Register(MessageStoreFile{})
 	gob.Register(MessageGetFile{})
+	gob.Register(MessageDeleteFile{})
 }
