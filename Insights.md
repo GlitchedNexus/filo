@@ -563,3 +563,5 @@ If your struct contains **any** of these:
 
 ## Why use Reader & Writers Instead of other things?
 While using byte buffers is a valid option to send data between peers, readers and writers are much more general and are compatible with every data type.
+
+# AES Encryption
