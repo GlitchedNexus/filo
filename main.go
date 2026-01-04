@@ -48,29 +48,31 @@ func main() {
 
 	time.Sleep(time.Second * 2)
 
-	key := "coolPicture.jpg"
-	data := bytes.NewReader([]byte("my big data file here!"))
+	for i := range 20 {
 
-	s2.Store(key, data)
+		key := fmt.Sprintf("picture_%d.png", i)
+		data := bytes.NewReader([]byte("my big data file here!"))
 
-	if err := s2.store.Delete(key); err != nil {
-		log.Fatal(err)
+		s2.Store(key, data)
+
+		if err := s2.store.Delete(key); err != nil {
+			log.Fatal(err)
+		}
+
+		time.Sleep(time.Millisecond * 5)
+
+		r, err := s2.Get(key)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		b, err := io.ReadAll(r)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println(string(b))
 	}
-
-	time.Sleep(time.Millisecond * 5)
-
-	r, err := s2.Get(key)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	b, err := io.ReadAll(r)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(string(b))
-
 }
