@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -47,11 +46,11 @@ func main() {
 
 	time.Sleep(time.Second * 2)
 
-	data := bytes.NewReader([]byte("my big data file here!"))
+	// data := bytes.NewReader([]byte("my big data file here!"))
 
-	s2.Store("coolPicture.jpg", data)
+	// s2.Store("coolPicture.jpg", data)
 
-	time.Sleep(time.Millisecond * 5)
+	// time.Sleep(time.Millisecond * 5)
 
 	r, err := s2.Get("coolPicture.jpg")
 
