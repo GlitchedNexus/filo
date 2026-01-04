@@ -103,6 +103,8 @@ func (s *FileServer) broadcast(msg *Message) error {
 	}
 
 	for _, peer := range s.peers {
+		peer.Send([]byte{p2p.IncomingMessage})
+
 		if err := peer.Send(buf.Bytes()); err != nil {
 			return err
 		}
@@ -136,7 +138,7 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 
 		fileBuffer := new(bytes.Buffer)
 
-		n, err := io.CopyN(fileBuffer, peer, 22)
+		n, err := io.Copy(fileBuffer, peer)
 
 		if err != nil {
 			return nil, err
@@ -178,10 +180,13 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 		return err
 	}
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Millisecond * 2)
 
 	// TODO: (@GlitchedNexus) use a multi-writer here.
 	for _, peer := range s.peers {
+
+		peer.Send([]byte{p2p.IncomingStream})
+
 		n, err := io.Copy(peer, fileBuffer)
 
 		if err != nil {
@@ -286,7 +291,7 @@ func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 		return err
 	}
 
-	log.Printf("written %d bytes to disk\n", n)
+	log.Printf("[%s] written %d bytes to disk\n", s.Transport.Addr(), n)
 
 	peer.(*p2p.TCPPeer).Wg.Done()
 
