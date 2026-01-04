@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -46,29 +47,24 @@ func main() {
 
 	time.Sleep(time.Second * 2)
 
-	for i := range 10 {
+	data := bytes.NewReader([]byte("my big data file here!"))
 
-		data := bytes.NewReader([]byte("my big data file here!"))
+	s2.Store("coolPicture.jpg", data)
 
-		s2.Store(fmt.Sprintf("myprivatedata_%d", i), data)
+	time.Sleep(time.Millisecond * 5)
 
-		time.Sleep(time.Millisecond * 5)
+	r, err := s2.Get("coolPicture.jpg")
 
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// r, err := s2.Get("myprivatedata")
+	b, err := io.ReadAll(r)
 
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// b, err := io.ReadAll(r)
+	fmt.Println(string(b))
 
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// fmt.Println(string(b))
-
-	select {}
 }
