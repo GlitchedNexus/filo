@@ -1,28 +1,28 @@
-# Use the official Golang image to build the binary
 FROM golang:1.25-alpine AS builder
+
+# Install git (required for fetching some Go modules)
+RUN apk add --no-cache git
 
 WORKDIR /app
 
-# Copy go.mod and go.sum first to leverage Docker cache
+# Copy go.mod and go.sum and download dependencies
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the source code
+# Copy the rest of the source
 COPY . .
 
-# Build the application
-RUN go build -o filo .
+# Build a statically linked binary (better for Alpine)
+RUN CGO_ENABLED=0 GOOS=linux go build -o filo .
 
-# Use a minimal alpine image for the final container
 FROM alpine:latest
+RUN apk add --no-cache ca-certificates
 WORKDIR /root/
 
-# Copy the binary from the builder stage
 COPY --from=builder /app/filo .
 
-# Expose the P2P port (e.g., 3000) and the Metrics port (8081)
-EXPOSE 3000
+# Match your .env LISTEN_ADDR and Prometheus port
+EXPOSE 4000
 EXPOSE 8081
 
-# Run the application
 CMD ["./filo"]

@@ -438,12 +438,23 @@ func (s *FileServer) bootstrapMigration(interval time.Duration) {
     }()
 }
 
-func (s *FileServer) scanAndMigrate() {
-    // Walk the storage root
-    filepath.Walk(s.store.Root, func(path string, info os.FileInfo, err error) error {
-        if !info.IsDir() && time.Since(info.ModTime()) > 5 * time.Minute {
-            // Logic to derive key from path and call s.store.MoveToS3(key)
-        }
-        return nil
-    })
+func (s *FileServer) scanAndMigrate() error {
+	return filepath.Walk(s.StorageRoot, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Migrate files older than 5 minutes
+		if !info.IsDir() && time.Since(info.ModTime()) > 5*time.Minute {
+			key := info.Name()
+			log.Printf("identifying [%s] as cold data; migrating to S3...", key)
+			
+			// Calling MoveToS3 in store.go
+			if err := s.store.MoveToS3(s.ID, key); err != nil {
+				log.Printf("migration failed for [%s]: %v", key, err)
+				return nil 
+			}
+		}
+		return nil
+	})
 }

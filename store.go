@@ -74,18 +74,14 @@ func NewStore(options StoreOptions) *Store {
 	if options.PathTransformFunc == nil {
 		options.PathTransformFunc = DefaultPathTransformFunc
 	}
+
 	if len(options.Root) == 0 {
 		options.Root = defaultRootFolderName
 	}
 
-	// Loads AWS config from environment variables or IAM Roles
-	cfg, err := config.LoadDefaultConfig(context.TODO())
-	if err != nil {
-		log.Printf("error loading AWS config: %v", err)
-	}
-
+	cfg, _ := config.LoadDefaultConfig(context.TODO())
 	return &Store{
-		StoreOptions: options,
+		StoreOptions: options, // Changed from StoreOpts: opts
 		s3Client:     s3.NewFromConfig(cfg),
 	}
 }
@@ -97,7 +93,7 @@ func (s *Store) MoveToS3(id string, key string) error {
 
 	file, err := os.Open(fullPathWithRoot)
 	if err != nil {
-		return fmt.Errorf("could not open local file for migration: %w", err)
+		return err
 	}
 	defer file.Close()
 
@@ -105,15 +101,15 @@ func (s *Store) MoveToS3(id string, key string) error {
 	s3Key := fmt.Sprintf("%s/%s", id, key)
 
 	_, err = s.s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(s3Key),
+		Bucket: &bucketName,
+		Key:    &s3Key,
 		Body:   file,
 	})
+	
 	if err != nil {
-		return fmt.Errorf("S3 upload failed: %w", err)
+		return err
 	}
 
-	log.Printf("migrated [%s] to S3 bucket [%s]", key, bucketName)
 	return os.Remove(fullPathWithRoot)
 }
 

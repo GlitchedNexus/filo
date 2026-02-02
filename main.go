@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -73,5 +74,7 @@ func main() {
     // Trigger the background migration loop if you implemented it in server.go
     s.bootstrapMigration(5 * time.Minute) 
 
-    s.Start()
+	if err := s.Start(); err != nil {
+		log.Fatalf("Critical: Server failed to start: %v", err)
+	}
 }
