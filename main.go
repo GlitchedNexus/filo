@@ -55,7 +55,7 @@ func main() {
 
     listenAddr := os.Getenv("LISTEN_ADDR")
     if listenAddr == "" {
-        listenAddr = ":3000"
+        listenAddr = ":4000"
     }
 
     // Capture bootstrap nodes from env to allow dynamic cluster joining
