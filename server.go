@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -425,4 +427,23 @@ func init() {
 	gob.Register(MessageStoreFile{})
 	gob.Register(MessageGetFile{})
 	gob.Register(MessageDeleteFile{})
+}
+
+func (s *FileServer) bootstrapMigration(interval time.Duration) {
+    ticker := time.NewTicker(interval)
+    go func() {
+        for range ticker.C {
+            s.scanAndMigrate()
+        }
+    }()
+}
+
+func (s *FileServer) scanAndMigrate() {
+    // Walk the storage root
+    filepath.Walk(s.store.Root, func(path string, info os.FileInfo, err error) error {
+        if !info.IsDir() && time.Since(info.ModTime()) > 5 * time.Minute {
+            // Logic to derive key from path and call s.store.MoveToS3(key)
+        }
+        return nil
+    })
 }

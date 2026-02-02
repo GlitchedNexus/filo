@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
@@ -9,6 +10,10 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 const defaultRootFolderName = "ggnetwork"
@@ -20,25 +25,16 @@ type PathKey struct {
 	FileName string
 }
 
-// Each key is transformed to some path on disk
 func CASPathTransformFunc(key string) PathKey {
 	hash := sha1.Sum([]byte(key))
-
-	// To convert a byte array to a slice we can do
-	// ex. 20[byte] => []byte => [:]
 	hashStr := hex.EncodeToString(hash[:])
-
 	blockSize := 5
-
 	sliceLength := len(hashStr) / blockSize
-
 	paths := make([]string, sliceLength)
-
 	for i := range sliceLength {
 		from, to := i*blockSize, (i*blockSize)+blockSize
 		paths[i] = hashStr[from:to]
 	}
-
 	return PathKey{
 		PathName: strings.Join(paths, "/"),
 		FileName: hashStr,
@@ -58,17 +54,12 @@ func (p PathKey) FullPath() string {
 
 func (p PathKey) FirstPathName() string {
 	paths := strings.Split(p.PathName, "/")
-
 	if len(paths) == 0 {
 		return ""
 	}
-
 	return paths[0]
 }
 
-// Root:
-//   - contains the folde rname of the root, containing all the files/folders
-//     of the system.
 type StoreOptions struct {
 	Root              string
 	PathTransformFunc PathTransformFunc
@@ -76,21 +67,81 @@ type StoreOptions struct {
 
 type Store struct {
 	StoreOptions
+	s3Client *s3.Client
 }
 
 func NewStore(options StoreOptions) *Store {
-
 	if options.PathTransformFunc == nil {
 		options.PathTransformFunc = DefaultPathTransformFunc
 	}
-
 	if len(options.Root) == 0 {
 		options.Root = defaultRootFolderName
 	}
 
+	// Loads AWS config from environment variables or IAM Roles
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		log.Printf("error loading AWS config: %v", err)
+	}
+
 	return &Store{
 		StoreOptions: options,
+		s3Client:     s3.NewFromConfig(cfg),
 	}
+}
+
+// MoveToS3 transfers a local file to S3 cold storage and deletes the local copy.
+func (s *Store) MoveToS3(id string, key string) error {
+	pathKey := s.PathTransformFunc(key)
+	fullPathWithRoot := fmt.Sprintf("%s/%s/%s", s.Root, id, pathKey.FullPath())
+
+	file, err := os.Open(fullPathWithRoot)
+	if err != nil {
+		return fmt.Errorf("could not open local file for migration: %w", err)
+	}
+	defer file.Close()
+
+	bucketName := os.Getenv("S3_BUCKET_NAME")
+	s3Key := fmt.Sprintf("%s/%s", id, key)
+
+	_, err = s.s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(s3Key),
+		Body:   file,
+	})
+	if err != nil {
+		return fmt.Errorf("S3 upload failed: %w", err)
+	}
+
+	log.Printf("migrated [%s] to S3 bucket [%s]", key, bucketName)
+	return os.Remove(fullPathWithRoot)
+}
+
+// Read tries to fetch from local storage first, then falls back to S3.
+func (s *Store) Read(id string, key string) (int64, io.ReadCloser, error) {
+	// 1. Try local storage
+	size, r, err := s.readStream(id, key)
+	if err == nil {
+		return size, r, nil
+	}
+
+	// 2. If not on disk, check S3
+	if errors.Is(err, os.ErrNotExist) {
+		log.Printf("[%s] not found locally, attempting to thaw from S3...", key)
+		
+		s3Key := fmt.Sprintf("%s/%s", id, key)
+		output, err := s.s3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+			Bucket: aws.String(os.Getenv("S3_BUCKET_NAME")),
+			Key:    aws.String(s3Key),
+		})
+		if err != nil {
+			return 0, nil, fmt.Errorf("file not found locally or in S3: %w", err)
+		}
+
+		return *output.ContentLength, output.Body, nil
+	}
+
+	return 0, nil, err
 }
 
 func (s *Store) Has(id string, key string) bool {
@@ -158,10 +209,6 @@ func (s *Store) writeStream(id string, key string, r io.Reader) (int64, error) {
 	}
 
 	return io.Copy(f, r)
-}
-
-func (s *Store) Read(id string, key string) (int64, io.Reader, error) {
-	return s.readStream(id, key)
 }
 
 func (s *Store) readStream(id string, key string) (int64, io.ReadCloser, error) {
