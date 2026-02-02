@@ -2,6 +2,8 @@ package main
 
 import (
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/GlitchedNexus/filo/p2p"
 	"github.com/prometheus/client_golang/prometheus"
@@ -45,14 +47,20 @@ var (
 )
 
 func main() {
-
+    // Port 8081 for metrics (as previously implemented)
     go func() {
         http.Handle("/metrics", promhttp.Handler())
         http.ListenAndServe(":8081", nil)
     }()
-	
-	s := makeServer(":3000", "")
 
-	s.Start()
-	
+    listenAddr := os.Getenv("LISTEN_ADDR")
+    if listenAddr == "" {
+        listenAddr = ":3000"
+    }
+
+    // Capture bootstrap nodes from env to allow dynamic cluster joining
+    bootstrapNodes := strings.Split(os.Getenv("BOOTSTRAP_NODES"), ",")
+
+    s := makeServer(listenAddr, bootstrapNodes...)
+    s.Start()
 }
