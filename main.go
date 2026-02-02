@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
-	"log"
-	"time"
+	"net/http"
 
 	"github.com/GlitchedNexus/filo/p2p"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func makeServer(listenAddr string, nodes ...string) *FileServer {
@@ -33,46 +33,26 @@ func makeServer(listenAddr string, nodes ...string) *FileServer {
 	return s
 }
 
+var (
+    filesStored = promauto.NewCounter(prometheus.CounterOpts{
+        Name: "filo_files_stored_total",
+        Help: "The total number of files stored on this node",
+    })
+    activePeers = promauto.NewGauge(prometheus.GaugeOpts{
+        Name: "filo_active_peers",
+        Help: "The number of active peer connections in the cluster",
+    })
+)
+
 func main() {
-	s1 := makeServer(":3000", "")
-	s2 := makeServer(":4000", "")
-	s3 := makeServer(":6000", ":3000", ":4000")
 
-	go func() { log.Fatal(s1.Start()) }()
-	time.Sleep(500 * time.Millisecond)
-	go func() { log.Fatal(s2.Start()) }()
+    go func() {
+        http.Handle("/metrics", promhttp.Handler())
+        http.ListenAndServe(":8081", nil)
+    }()
+	
+	s := makeServer(":3000", "")
 
-	time.Sleep(2 * time.Second)
-
-	go func() { log.Fatal(s3.Start()) }()
-	time.Sleep(2 * time.Second)
-	fmt.Println("s3 peers:", len(s3.peers))
-
-	for i := range 5 {
-		key := fmt.Sprintf("picture_%d.png", i)
-		data := bytes.NewReader([]byte("my big data file here!"))
-		s3.Store(key, data)
-
-		time.Sleep(time.Millisecond * 500)
-
-		// if err := s3.store.Delete(s3.ID, key); err != nil {
-		// 	log.Fatal(err)
-		// }
-
-		// r, err := s3.Get(key)
-		// if err != nil {
-		// 	log.Fatal(err)
-		// }
-
-		// b, err := io.ReadAll(r)
-		// if err != nil {
-		// 	log.Fatal(err)
-		// }
-
-		// fmt.Println(string(b))
-
-		if err := s3.Delete(key); err != nil {
-			log.Fatal(err)
-		}
-	}
+	s.Start()
+	
 }

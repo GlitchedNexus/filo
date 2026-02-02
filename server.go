@@ -257,6 +257,7 @@ func (s *FileServer) OnPeer(p p2p.Peer) error {
 	defer s.peerLock.Unlock()
 
 	s.peers[p.RemoteAddr().String()] = p
+	activePeers.Inc()
 
 	log.Printf("connected with remote %s", p.RemoteAddr())
 
@@ -315,6 +316,8 @@ func (s *FileServer) handleMessageDeleteFile(from string, msg MessageDeleteFile)
 	if err := s.store.Delete(msg.ID, msg.Key); err != nil {
 		return err
 	}
+
+	filesStored.Desc()
 
 	fmt.Printf("[%s] File Deleted...", s.Transport.Addr())
 
@@ -376,6 +379,8 @@ func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 	log.Printf("[%s] written %d bytes to disk\n", s.Transport.Addr(), n)
 
 	peer.CloseStream()
+
+	filesStored.Inc()
 
 	return nil
 }
