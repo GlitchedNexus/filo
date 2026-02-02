@@ -1,4 +1,4 @@
-# Filo - A Lightweight Distributed File System (Go)
+# Filo - A Cloud-Native Distributed File Storage System (Go)
 
 ## Overview
 
