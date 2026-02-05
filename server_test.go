@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"testing"
 	"time"
@@ -30,21 +31,21 @@ func TestSystem(t *testing.T) {
 
 		time.Sleep(time.Millisecond * 500)
 
-		// if err := s3.store.Delete(s3.ID, key); err != nil {
-		// 	log.Fatal(err)
-		// }
+		if err := s3.store.Delete(s3.ID, key); err != nil {
+			log.Fatal(err)
+		}
 
-		// r, err := s3.Get(key)
-		// if err != nil {
-		// 	log.Fatal(err)
-		// }
+		r, err := s3.Get(key)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-		// b, err := io.ReadAll(r)
-		// if err != nil {
-		// 	log.Fatal(err)
-		// }
+		b, err := io.ReadAll(r)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-		// fmt.Println(string(b))
+		fmt.Println(string(b))
 
 		if err := s3.Delete(key); err != nil {
 			log.Fatal(err)
